@@ -1,0 +1,13 @@
+torch
+pillow
+google
+dotenv
+fastapi
+uvicorn
+requests
+torchvision
+transformers
+opencv-python
+python-dotenv
+python-multipart
+streamlit>=1.28.0

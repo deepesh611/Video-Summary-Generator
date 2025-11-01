@@ -1,0 +1,10 @@
+.venv
+.idea
+__pycache__/
+
+app/uploads/
+app/.streamlit/secrets.toml
+
+backend/.env
+backend/uploads/
+backend/requirements.txt
