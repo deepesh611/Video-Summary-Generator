@@ -1,39 +1,48 @@
-# Video Summary Generator
+# Video Summary Generator 🎬
 
-A deep learning-based application that generates text summaries from video inputs. The project consists of a Streamlit frontend for video upload and a FastAPI backend that processes videos through a sophisticated ML pipeline to generate summaries.
+![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-orange.svg)
+![Modal](https://img.shields.io/badge/Modal-Serverless-purple.svg)
 
-## 🎬 Features
+A deep learning-based application that generates text summaries from video inputs. The project features a **Streamlit** frontend for video upload and a **FastAPI** backend deployed on **Modal** that processes videos through a sophisticated ML pipeline to generate summaries.
 
-- **Video Upload Interface**: User-friendly Streamlit frontend supporting `.mp4`, `.mkv`, and `.mov` formats
-- **Intelligent Frame Extraction**: Automatically extracts and selects key frames from videos
-- **Deep Learning Pipeline**:
-  - Frame feature extraction using ResNet50
-  - Frame importance scoring with LSTM model
+## 🎯 Features
+
+- **🎥 Video Upload Interface**: User-friendly Streamlit frontend supporting `.mp4`, `.mkv`, and `.mov` formats
+- **🧠 Intelligent Frame Extraction**: Automatically extracts and selects key frames from videos
+- **🤖 Deep Learning Pipeline**:
+  - Frame feature extraction using **ResNet50**
+  - Frame importance scoring with **LSTM** model
   - Key frame selection based on importance thresholds
-  - Caption generation using BLIP (Salesforce/blip-image-captioning-base)
+  - Caption generation using **BLIP** (Salesforce/blip-image-captioning-base)
   - Optional API-based final summarization
-- **Automatic Cleanup**: Temporary files and old uploads are automatically managed
-- **RESTful API**: FastAPI backend with proper error handling and CORS support
-- **Secure Configuration**: Environment-based configuration for API keys and secrets
-
-## 📋 Requirements
-
-- Python 3.8+
-- CUDA-compatible GPU (optional, but recommended for faster processing)
-- Minimum 4GB RAM (8GB+ recommended)
-- Disk space for video storage and model cache
+- **☁️ Cloud Deployment**: Backend hosted on **Modal** (serverless with GPU support), frontend on **Streamlit Cloud**
+- **🧹 Automatic Cleanup**: Temporary files and old uploads are automatically managed
+- **🔒 Secure Configuration**: Environment-based configuration for API keys and secrets
 
 ## 🏗️ Architecture
 
-The project is split into two main components:
+```
+┌─────────────────┐          ┌──────────────────┐          ┌─────────────────┐
+│  Streamlit      │          │   Modal          │          │   ML Pipeline   │
+│  Frontend       │────────▶│   Backend         │────────▶│   (PyTorch)     │
+│  (Cloud/Local)  │  HTTP    │   (FastAPI)      │          │   • ResNet50    │
+│                 │          │   • GPU Support  │          │   • LSTM        │
+│                 │          │   • Auto-scaling │          │   • BLIP        │
+└─────────────────┘          └──────────────────┘          └─────────────────┘
+```
 
 ### Frontend (`app/`)
 - **Streamlit Application**: Web-based UI for video upload and result display
 - Handles file upload, displays processing status, and manages user sessions
 - Automatic cleanup of old uploads (24+ hours)
+- Configurable backend API URL (Modal deployment)
 
 ### Backend (`backend/`)
 - **FastAPI Server**: RESTful API for video processing
+- **Modal Deployment**: Serverless deployment with GPU support (T4/A10G)
 - **ML Pipeline**: Complete deep learning workflow for video-to-text summarization
   - Video frame extraction (OpenCV)
   - Feature extraction (ResNet50)
@@ -41,16 +50,50 @@ The project is split into two main components:
   - Caption generation (BLIP)
   - Optional API summarization
 
-## 🚀 Installation
+## 🛠️ Technology Stack
 
-### 1. Clone the Repository
+### Core Framework
+- ![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white) **Python 3.11+**
+- ![FastAPI](https://img.shields.io/badge/-FastAPI-009688?logo=fastapi&logoColor=white) **FastAPI** - Modern, fast web framework
+- ![Streamlit](https://img.shields.io/badge/-Streamlit-FF4B4B?logo=streamlit&logoColor=white) **Streamlit** - Rapid web app development
+
+### Deployment & Infrastructure
+- ![Modal](https://img.shields.io/badge/-Modal-000000?logo=modal&logoColor=white) **Modal** - Serverless GPU platform for backend
+- ![Streamlit Cloud](https://img.shields.io/badge/-Streamlit_Cloud-FF4B4B?logo=streamlit&logoColor=white) **Streamlit Cloud** - Hosting for frontend
+
+### Deep Learning & ML
+- ![PyTorch](https://img.shields.io/badge/-PyTorch-EE4C2C?logo=pytorch&logoColor=white) **PyTorch** - Deep learning framework
+- ![Torchvision](https://img.shields.io/badge/-Torchvision-EE4C2C?logo=pytorch&logoColor=white) **Torchvision** - Computer vision utilities
+- ![Transformers](https://img.shields.io/badge/-Transformers-FFD700?logo=huggingface&logoColor=white) **Transformers (HuggingFace)** - Pre-trained models (BLIP)
+
+### Computer Vision
+- ![OpenCV](https://img.shields.io/badge/-OpenCV-5C3EE8?logo=opencv&logoColor=white) **OpenCV** - Video processing and frame extraction
+- ![Pillow](https://img.shields.io/badge/-Pillow-013243?logo=python&logoColor=white) **Pillow (PIL)** - Image processing
+
+### Utilities
+- ![Uvicorn](https://img.shields.io/badge/-Uvicorn-45948F?logo=python&logoColor=white) **Uvicorn** - ASGI server
+- ![python-dotenv](https://img.shields.io/badge/-python--dotenv-3776AB?logo=python&logoColor=white) **python-dotenv** - Environment variable management
+- ![Requests](https://img.shields.io/badge/-Requests-3776AB?logo=python&logoColor=white) **Requests** - HTTP client
+
+## 📋 Requirements
+
+- **Python**: 3.8+
+- **GPU**: Optional but recommended for faster processing (T4 available on Modal)
+- **Memory**: Minimum 4GB RAM (8GB+ recommended for local development)
+- **Disk Space**: For video storage and model cache (~5-10GB for models)
+
+## 🚀 Quick Start
+
+### Local Development Setup
+
+#### 1. Clone the Repository
 
 ```bash
 git clone <repository-url>
 cd Video-Summary-Generator
 ```
 
-### 2. Create Virtual Environment
+#### 2. Create Virtual Environment
 
 ```bash
 python -m venv .venv
@@ -62,89 +105,113 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Install Dependencies
+#### 3. Install Dependencies
 
-**Option A: Install from root requirements.txt (includes all dependencies)**
 ```bash
 pip install -r requirements.txt
 ```
 
-**Option B: Install separately for frontend and backend**
+#### 4. Run Locally
 
-Frontend:
-```bash
-cd app
-pip install -r requirements.txt
-```
-
-Backend:
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-### 4. Configure Environment Variables
-
-Create `backend/.env` file:
-
-```bash
-cd backend
-cp .env.example .env  # If .env.example exists, or create manually
-```
-
-Edit `backend/.env`:
-```env
-API_URL=https://your-api-url.com
-API_KEY=your_api_key_here
-MODEL_NAME=tngtech/deepseek-r1t2-chimera:free
-```
-
-**Note**: The API configuration is optional. If not provided, the pipeline will return combined frame captions without final API summarization.
-
-## 📖 Usage
-
-### Running the Frontend
-
-```bash
-cd app
-streamlit run main.py
-```
-
-The frontend will be available at `http://localhost:8501`
-
-### Running the Backend
-
+**Backend (local):**
 ```bash
 cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-The API will be available at `http://localhost:8000`
+**Frontend (local):**
+```bash
+cd app
+# Set backend URL (for local backend)
+export BACKEND_API_URL=http://localhost:8000  # Linux/Mac
+# OR
+set BACKEND_API_URL=http://localhost:8000  # Windows CMD
+# OR
+$env:BACKEND_API_URL="http://localhost:8000"  # Windows PowerShell
 
-**API Documentation**: Visit `http://localhost:8000/docs` for interactive API documentation.
+streamlit run main.py
+```
+
+## ☁️ Cloud Deployment
+
+### Deploy Backend to Modal
+
+1. **Install Modal CLI:**
+```bash
+pip install modal
+modal token new  # Authenticate
+```
+
+2. **Deploy Backend:**
+```bash
+modal deploy backend/modal_app.py
+```
+
+3. **Get Your Modal URL:**
+After deployment, Modal provides a URL like:
+```
+https://your-username--video-summary-generator-fastapi-app.modal.run
+```
+
+4. **Configure Secrets (Optional):**
+```bash
+modal secret create env \
+  API_URL=https://your-api-url.com \
+  API_KEY=your_api_key \
+  MODEL_NAME=tngtech/deepseek-r1t2-chimera:free
+```
+
+### Deploy Frontend to Streamlit Cloud
+
+1. **Push code to GitHub**
+
+2. **Configure Streamlit Cloud:**
+   - Go to [streamlit.io/cloud](https://streamlit.io/cloud)
+   - Click "New app"
+   - Connect your GitHub repository
+   - Set **Main file path**: `app/main.py`
+
+3. **Add Secrets:**
+   In Streamlit Cloud settings, add:
+   ```toml
+   BACKEND_API_URL = "https://your-modal-url.modal.run"
+   ```
+
+4. **Deploy!**
+
+### Test Modal Backend Locally
+
+You can run the frontend locally and connect it to your Modal backend:
+
+```bash
+# Set Modal backend URL
+export BACKEND_API_URL="https://your-username--video-summary-generator-fastapi-app.modal.run"
+
+# Run frontend
+cd app
+streamlit run main.py
+```
+
+## 📖 Usage
 
 ### Using the Application
 
-1. **Upload Video**: Use the Streamlit frontend to upload a video file
-2. **Processing**: The backend will:
-   - Extract frames from the video
-   - Extract features and score frame importance
-   - Generate captions for key frames
-   - Optionally summarize using external API
-3. **View Results**: The summary will be displayed in the frontend
+1. **Upload Video**: Use the Streamlit frontend to upload a video file (`.mp4`, `.mkv`, or `.mov`)
+2. **Process**: Click "Process Video" button
+3. **Wait**: Processing can take 5-30 minutes depending on video length (first request loads models)
+4. **View Results**: The generated summary will be displayed
 
 ### API Usage (Direct)
 
-You can also call the API directly:
+You can also call the Modal API directly:
 
 ```bash
-curl -X POST "http://localhost:8000/process_upload" \
+curl -X POST "https://your-modal-url.modal.run/process_upload" \
   -H "accept: application/json" \
-  -H "Content-Type: multipart/form-data" \
   -F "file=@your_video.mp4"
 ```
 
-Response:
+**Response:**
 ```json
 {
   "status": "success",
@@ -162,23 +229,21 @@ Video-Summary-Generator/
 │
 ├── app/                          # Streamlit Frontend
 │   ├── main.py                 # Main Streamlit application
-│   ├── requirements.txt        # Frontend dependencies
 │   ├── uploads/                # User uploads (auto-created, gitignored)
 │   └── .streamlit/             # Streamlit configuration
-│       └── secrets.toml        # Secrets (gitignored)
+│       └── secrets.toml        # Secrets for local (gitignored)
 │
 ├── backend/                     # FastAPI Backend
 │   ├── main.py                 # FastAPI application
 │   ├── pipeline.py             # ML pipeline implementation
-│   ├── requirements.txt        # Backend dependencies
-│   ├── uploads/                # Processed videos (auto-created, gitignored)
+│   ├── modal_app.py            # Modal deployment configuration
+│   ├── uploads/                # Processed videos (gitignored)
 │   └── .env                    # Environment variables (gitignored)
 │
 ├── notebooks/                   # Development notebooks
 │   └── notebook1.ipynb         # Original pipeline development
 │
-├── requirements.txt            # Root-level dependencies (all packages)
-├── setup.sh                    # Setup script
+├── requirements.txt            # Root-level dependencies
 ├── .gitignore                  # Git ignore rules
 ├── LICENSE                     # License file
 └── README.md                   # This file
@@ -188,34 +253,45 @@ Video-Summary-Generator/
 
 ### Frontend Configuration
 
-The frontend uses Streamlit's standard configuration. Secrets can be stored in `app/.streamlit/secrets.toml`:
+**Local (Environment Variable):**
+```bash
+export BACKEND_API_URL="https://your-modal-url.modal.run"
+```
 
+**Local (Streamlit secrets):**
+Create `app/.streamlit/secrets.toml`:
 ```toml
-[secrets]
-# Add any frontend secrets here
+BACKEND_API_URL = "https://your-modal-url.modal.run"
 ```
 
-### Backend Configuration
+**Streamlit Cloud:**
+Add secret in dashboard with key `BACKEND_API_URL`
 
-Backend configuration is done via `backend/.env`:
+### Backend Configuration (Modal)
 
-```env
-# Required for API summarization (optional)
-API_URL=https://api.example.com/v1/summarize
-API_KEY=your_api_key_here
-MODEL_NAME=tngtech/deepseek-r1t2-chimera:free
-
-# Optional: Processing settings
-MAX_VIDEO_DURATION_SECONDS=600
-FRAME_EXTRACTION_RATE=1
+**Modal Secrets:**
+Set via Modal dashboard or CLI:
+```bash
+modal secret create env \
+  API_URL=https://your-api-url.com \
+  API_KEY=your_api_key \
+  MODEL_NAME=tngtech/deepseek-r1t2-chimera:free
 ```
+
+**Note**: API configuration is optional. If not provided, the pipeline returns combined frame captions without final API summarization.
 
 ### Pipeline Parameters
 
-The pipeline can be customized in `backend/pipeline.py`:
-
+Customize in `backend/pipeline.py`:
 - `frame_skip`: Extract every Nth frame (default: 30)
 - `importance_threshold`: Threshold for frame selection (default: 0.5)
+
+### Modal Configuration
+
+Edit `backend/modal_app.py`:
+- `gpu`: GPU type ("T4", "A10G", "A100", or `None` for CPU)
+- `timeout`: Request timeout in seconds (default: 1800)
+- `memory`: Memory allocation in MB (default: 8192)
 
 ## 🔌 API Endpoints
 
@@ -272,29 +348,12 @@ Process an uploaded video and generate a summary.
 
 The pipeline consists of several stages:
 
-1. **Frame Extraction**: Uses OpenCV to extract frames at configurable intervals
-2. **Feature Extraction**: ResNet50 extracts 2048-dimensional feature vectors
-3. **Frame Scoring**: Bidirectional LSTM scores frame importance
-4. **Frame Selection**: Frames above threshold are selected as key frames
-5. **Caption Generation**: BLIP model generates natural language captions
-6. **Summarization**: Optional API call for final summary refinement
-
-## 🛠️ Technologies Used
-
-- **Frontend**: Streamlit
-- **Backend**: FastAPI, Uvicorn
-- **Deep Learning**: PyTorch, Torchvision, Transformers
-- **Computer Vision**: OpenCV, Pillow
-- **Video Processing**: OpenCV
-- **NLP**: Transformers (BLIP, optional T5)
-- **Utilities**: python-dotenv, requests
-
-## 🔐 Security Notes
-
-- API keys and secrets are loaded from `.env` files (gitignored)
-- Sensitive information is filtered from error messages
-- Upload directories are automatically cleaned up
-- File size limits prevent resource exhaustion
+1. **Frame Extraction**: Uses OpenCV to extract frames at configurable intervals (every 30th frame by default)
+2. **Feature Extraction**: ResNet50 extracts 2048-dimensional feature vectors from each frame
+3. **Frame Scoring**: Bidirectional LSTM scores frame importance using temporal context
+4. **Frame Selection**: Frames above threshold (0.5) are selected as key frames
+5. **Caption Generation**: BLIP model generates natural language captions for key frames
+6. **Summarization**: Optional API call for final summary refinement (if API_URL configured)
 
 ## 🧹 Cleanup
 
@@ -306,24 +365,43 @@ The application includes automatic cleanup features:
 
 ## 🐛 Troubleshooting
 
-### CUDA/GPU Issues
-- If CUDA is not available, the pipeline will run on CPU (slower)
-- Check GPU availability: `torch.cuda.is_available()`
+### Modal Deployment Issues
 
-### Model Download
-- Models are automatically downloaded on first run (BLIP, ResNet50)
-- Ensure stable internet connection for initial setup
-- Models are cached in `~/.cache/huggingface/` and `~/.cache/torch/`
+**Server not responding:**
+```bash
+# Check logs
+modal app logs video-summary-generator
 
-### Memory Issues
-- Reduce `frame_skip` to process fewer frames
-- Use smaller videos for testing
-- Consider increasing system RAM or using cloud instances
+# Test health endpoint
+curl https://your-url.modal.run/health
 
-### API Errors
-- Check `backend/.env` configuration
-- Verify API credentials are correct
-- If API fails, pipeline falls back to combined captions
+# Redeploy
+modal deploy backend/modal_app.py
+```
+
+**Cold start delays:**
+- First request after inactivity may take 30-60 seconds (model loading)
+- This is normal for serverless deployments
+
+**GPU not available:**
+- Edit `backend/modal_app.py` and set `gpu=None` for CPU-only
+
+### Frontend Connection Issues
+
+**Backend not connecting:**
+- Verify `BACKEND_API_URL` is set correctly
+- Test Modal URL: `curl https://your-url.modal.run/health`
+- Check CORS (Modal handles this automatically)
+
+
+## 📊 Performance Expectations
+
+- **Frame Extraction**: ~1-2 seconds per minute of video
+- **Feature Extraction**: ~2-5 seconds per frame (CPU) / ~0.5-1 second (GPU)
+- **Caption Generation**: ~1-2 seconds per key frame
+- **Total Time**: 
+  - CPU: ~5-10 minutes for a 1-minute video
+  - GPU (T4): ~2-5 minutes for a 1-minute video
 
 ## 📝 License
 
@@ -333,22 +411,20 @@ See [LICENSE](LICENSE) file for details.
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## 🚧 Future Improvements
-
-- [ ] Batch processing endpoint
-- [ ] Real-time processing status updates
-- [ ] Support for more video formats
-- [ ] Trained LSTM model checkpoint loading
-- [ ] Caching for processed videos
-- [ ] User authentication
-- [ ] Progress bars and status tracking
-- [ ] Multiple summarization strategies
-- [ ] Export summaries in multiple formats
-
 ## 📞 Support
 
-For issues and questions, please open an issue on the repository.
+For issues and questions:
+- Open an issue on the repository
+- Check Modal documentation: [modal.com/docs](https://modal.com/docs)
+- Check Streamlit documentation: [docs.streamlit.io](https://docs.streamlit.io)
+
+## 🙏 Acknowledgments
+
+- **ResNet50**: Pre-trained model for feature extraction
+- **BLIP**: Salesforce's image captioning model
+- **Modal**: Serverless GPU infrastructure
+- **Streamlit**: Rapid web app framework
 
 ---
 
-**Note**: This project is under active development. The pipeline may take several minutes to process videos depending on length and hardware capabilities.
+**Note**: This project is under active development. The pipeline may take several minutes to process videos depending on length and hardware capabilities. First request on Modal may experience cold start delays while models are loaded.

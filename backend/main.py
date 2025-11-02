@@ -1,21 +1,15 @@
-"""
-FastAPI backend for video-to-summary pipeline.
-
-This module provides the API endpoints for uploading videos and processing them
-through the deep learning pipeline to generate summaries.
-"""
 
 import os
 import uuid
+
 from pathlib import Path
 from typing import Optional
-
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, UploadFile, HTTPException, status
+from pipeline import run_pipeline
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, File, UploadFile, HTTPException, status
 
-from pipeline import run_pipeline
 
 # Load environment variables from backend/.env
 env_path = Path(__file__).parent / ".env"
@@ -49,38 +43,14 @@ def ensure_uploads_directory():
 
 
 def generate_run_id() -> str:
-    """
-    Generate a unique run ID using UUID.
-    
-    Returns:
-        str: A unique identifier for this processing run
-    """
     return str(uuid.uuid4())
 
 
 def get_file_extension(filename: str) -> Optional[str]:
-    """
-    Extract file extension from filename.
-    
-    Args:
-        filename: The name of the file
-        
-    Returns:
-        Optional[str]: The file extension (with dot) or None if invalid
-    """
     return Path(filename).suffix.lower()
 
 
 def is_valid_video_format(filename: str) -> bool:
-    """
-    Check if the file has a supported video format.
-    
-    Args:
-        filename: The name of the file to check
-        
-    Returns:
-        bool: True if format is supported, False otherwise
-    """
     ext = get_file_extension(filename)
     return ext in SUPPORTED_EXTENSIONS if ext else False
 

@@ -1,9 +1,3 @@
-"""
-Modal deployment file for FastAPI backend.
-
-This file wraps the FastAPI app for deployment on Modal.
-Run: modal deploy backend/modal_app.py
-"""
 
 import modal
 
