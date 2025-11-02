@@ -1,9 +1,11 @@
 import os
 import uuid
 import shutil
+import requests
 import streamlit as st
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 # Page configuration
 st.set_page_config(
@@ -15,6 +17,11 @@ st.set_page_config(
 # Constants
 UPLOADS_DIR = Path(__file__).parent / "uploads"
 SUPPORTED_FORMATS = [".mp4", ".mkv", ".mov"]
+
+# Backend API Configuration
+# Set this to your Modal deployment URL after deploying
+# Format: https://your-username--video-summary-generator-fastapi-app.modal.run
+BACKEND_API_URL = os.getenv("BACKEND_API_URL", st.secrets.get("BACKEND_API_URL", ""))
 
 
 def ensure_uploads_directory():
@@ -62,6 +69,69 @@ def cleanup_upload(run_dir_path):
             st.error(f"Error cleaning up: {e}")
             return False
     return False
+
+
+def process_video_api(file_info: dict, api_url: str):
+    """
+    Send video file to backend API for processing.
+    
+    Args:
+        file_info: Dictionary containing file information
+        api_url: Backend API URL
+    """
+    file_path = file_info.get("file_path")
+    if not file_path or not Path(file_path).exists():
+        st.error("Video file not found. Please upload again.")
+        return
+    
+    # Show progress
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    try:
+        status_text.text("📤 Uploading video to backend...")
+        progress_bar.progress(10)
+        
+        # Read file
+        with open(file_path, "rb") as f:
+            files = {"file": (file_info["filename"], f, "video/mp4")}
+            
+            status_text.text("🔄 Processing video (this may take several minutes)...")
+            progress_bar.progress(30)
+            
+            # Send request to backend
+            response = requests.post(
+                f"{api_url}/process_upload",
+                files=files,
+                timeout=1800  # 30 minute timeout
+            )
+            
+            progress_bar.progress(90)
+            
+            # Check response
+            if response.status_code == 200:
+                result = response.json()
+                st.session_state.processing_result = result
+                progress_bar.progress(100)
+                status_text.text("✅ Processing complete!")
+                st.rerun()
+            else:
+                error_msg = response.json().get("detail", "Unknown error")
+                st.error(f"❌ Processing failed: {error_msg}")
+                status_text.text("❌ Error occurred")
+                
+    except requests.exceptions.Timeout:
+        st.error("⏱️ Request timed out. Video processing may take longer than expected.")
+        status_text.text("⏱️ Timeout")
+    except requests.exceptions.RequestException as e:
+        st.error(f"❌ Connection error: {str(e)}")
+        status_text.text("❌ Connection error")
+    except Exception as e:
+        st.error(f"❌ Unexpected error: {str(e)}")
+        status_text.text("❌ Error")
+    finally:
+        progress_bar.empty()
+        status_text.empty()
 
 
 def cleanup_old_uploads(max_age_hours=24):
@@ -168,17 +238,31 @@ def main():
             st.markdown("**Storage Location:**")
             st.code(file_info['file_path'], language=None)
         
-        # Status/Progress area (placeholder for future pipeline steps)
+        # Status/Progress area
         st.divider()
         st.subheader("Pipeline Status")
         
-        status_container = st.container()
-        with status_container:
-            st.info("📋 Ready to proceed with video processing pipeline.")
-            st.markdown("**Next steps:**")
-            st.markdown("- Frame extraction")
-            st.markdown("- Video analysis")
-            st.markdown("- Summary generation")
+        # Check if processing result exists
+        if "processing_result" in st.session_state and st.session_state.processing_result:
+            result = st.session_state.processing_result
+            st.success("✅ Processing Complete!")
+            st.markdown("### Summary")
+            st.write(result.get("summary", "No summary available"))
+            
+            # Display result metadata
+            with st.expander("View Processing Details"):
+                st.json(result)
+        else:
+            status_container = st.container()
+            with status_container:
+                if BACKEND_API_URL:
+                    st.info("📋 Ready to proceed with video processing pipeline.")
+                    st.markdown("**Next steps:**")
+                    st.markdown("- Upload video ✓")
+                    st.markdown("- Click 'Process Video' to generate summary")
+                    st.markdown("- View results")
+                else:
+                    st.warning("⚠️ Backend API not configured. Set BACKEND_API_URL in Streamlit secrets.")
         
         # Action buttons
         st.divider()
@@ -186,13 +270,17 @@ def main():
         
         with col_btn2:
             proceed_button = st.button(
-                "🚀 Proceed",
+                "🚀 Process Video",
                 type="primary",
-                use_container_width=True
+                use_container_width=True,
+                disabled=not BACKEND_API_URL
             )
             
-            if proceed_button:
-                st.info("Proceed button clicked! Pipeline integration coming soon.")
+            if proceed_button and BACKEND_API_URL:
+                # Process video through backend API
+                process_video_api(file_info, BACKEND_API_URL)
+            elif proceed_button and not BACKEND_API_URL:
+                st.error("⚠️ Backend API URL not configured. Please set BACKEND_API_URL in Streamlit secrets.")
         
         with col_btn3:
             clear_button = st.button(
@@ -211,9 +299,20 @@ def main():
                 else:
                     st.error("Failed to clear upload.")
         
-        # Sidebar with cleanup utilities
+        # Sidebar with cleanup utilities and backend status
         with st.sidebar:
             st.header("📁 Upload Management")
+            st.markdown("---")
+            
+            # Backend status
+            st.markdown("**Backend Status:**")
+            if BACKEND_API_URL:
+                st.success("✅ Connected")
+                st.caption(f"URL: `{BACKEND_API_URL[:50]}...`")
+            else:
+                st.warning("⚠️ Not configured")
+                st.caption("Set BACKEND_API_URL in secrets")
+            
             st.markdown("---")
             
             # Show current upload stats
@@ -254,6 +353,8 @@ def main():
             st.session_state.uploaded_file_info = None
         if st.session_state.run_id is not None:
             st.session_state.run_id = None
+        if "processing_result" in st.session_state:
+            st.session_state.processing_result = None
 
 
 if __name__ == "__main__":

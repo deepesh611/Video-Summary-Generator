@@ -1,10 +1,31 @@
-.venv
-.idea
+# Python
 __pycache__/
 
-app/uploads/
-app/.streamlit/secrets.toml
+# Virtual Environments
+.venv/
 
+# IDE - VS Code
+.vscode/
+
+# IDE - PyCharm / IntelliJ
+.idea/
+
+# IDE - Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# Project-specific: Upload directories
+app/uploads/
+
+# Project-specific: Secrets and environment files
 backend/.env
-backend/uploads/
-backend/requirements.txt
+app/.streamlit/secrets.toml
+.env
+*.env
+
+# Project-specific: Modal
+.modal_cache/
+.modal/
+
+# Trial Folders
+trial
