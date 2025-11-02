@@ -63,7 +63,14 @@ def fastapi_app():
     # if you created a secret named "env" with API_URL, API_KEY, etc.
     # Modal secrets are already in os.environ at this point
     
-    # Import and return the FastAPI app
-    from main import app as fastapi_application
-    return fastapi_application
+    try:
+        # Import and return the FastAPI app
+        from main import app as fastapi_application
+        return fastapi_application
+    except Exception as e:
+        # Print error for debugging
+        import traceback
+        print(f"Error importing FastAPI app: {e}")
+        print(traceback.format_exc())
+        raise
 
