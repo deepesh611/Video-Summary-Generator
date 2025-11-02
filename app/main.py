@@ -111,12 +111,30 @@ def process_video_api(file_info: dict, api_url: str):
             # Check response
             if response.status_code == 200:
                 result = response.json()
+                
+                # Debug: Log the response structure (optional, can remove later)
+                # print(f"Response keys: {result.keys()}")
+                # print(f"Summary present: {'summary' in result}")
+                
+                # Validate that summary exists in response
+                if "summary" not in result:
+                    st.error(f"❌ Response missing 'summary' key. Response: {result}")
+                    status_text.text("❌ Invalid response format")
+                    return
+                
+                # Store result and trigger rerun to display summary
                 st.session_state.processing_result = result
                 progress_bar.progress(100)
                 status_text.text("✅ Processing complete!")
                 st.rerun()
             else:
-                error_msg = response.json().get("detail", "Unknown error")
+                # Try to get error detail from response
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get("detail", error_data.get("message", "Unknown error"))
+                except:
+                    error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+                
                 st.error(f"❌ Processing failed: {error_msg}")
                 status_text.text("❌ Error occurred")
                 
@@ -245,9 +263,18 @@ def main():
         # Check if processing result exists
         if "processing_result" in st.session_state and st.session_state.processing_result:
             result = st.session_state.processing_result
+            
+            # Verify summary exists
+            summary = result.get("summary")
+            
             st.success("✅ Processing Complete!")
             st.markdown("### Summary")
-            st.write(result.get("summary", "No summary available"))
+            
+            if summary:
+                st.write(summary)
+            else:
+                st.warning("⚠️ Summary not found in response.")
+                st.json(result)  # Show full response for debugging
             
             # Display result metadata
             with st.expander("View Processing Details"):
