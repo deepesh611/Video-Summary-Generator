@@ -260,7 +260,7 @@ def summarize_with_api(video_summary_text: str) -> Optional[str]:
                 "model": model_name,
                 "messages": [{
                     "role": "user",
-                    "content": f'''Rewrite and summarize this video breakdown in as much detail as possible for a general audience. Only give the summary, no other intro or outro.:
+                    "content": f'''Rewrite and summarize this video breakdown without missing any key factors for a general audience. Only give the summary, no other intro or outro.:
 
 {video_summary_text}'''
                 }]

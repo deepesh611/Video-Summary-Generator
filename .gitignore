@@ -16,6 +16,7 @@ __pycache__/
 
 # Project-specific: Upload directories
 app/uploads/
+app/secrets.toml
 
 # Project-specific: Secrets and environment files
 backend/.env

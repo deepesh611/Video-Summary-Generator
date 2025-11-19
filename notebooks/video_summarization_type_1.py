@@ -134,13 +134,13 @@ with open("/content/drive/MyDrive/Video-to-Text Summarization/video_summary.txt"
     for line in video_summary:
         f.write(line + "\n")
 
-summarizer = pipeline("summarization", model="t5-small")
+summarizer = pipeline("summarization", model="tngtech/deepseek-r1t2-chimera:free")
 
 f = open("/content/drive/MyDrive/Video-to-Text Summarization/video_summary.txt", "r")
 summary_raw = f.read()
 
-api_url = "https://openrouter.ai/api/v1/chat/completions"
-api_key = "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"
+api_url = os.getenv("API_URL")
+api_key = os.getenv("API_KEY")
 
 response = requests.post(
     api_url,
