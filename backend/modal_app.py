@@ -23,7 +23,7 @@ image = (
 )
 
 # Create the Modal app
-app = modal.App("video-summary-generator")
+app = modal.App("VideoDigest")
 
 # Define the ASGI web endpoint
 @app.function(

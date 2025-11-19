@@ -29,3 +29,6 @@ app/.streamlit/secrets.toml
 
 # Trial Folders
 trial
+
+.devcontainer/
+dataset
