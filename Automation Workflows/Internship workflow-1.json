@@ -1,0 +1,429 @@
+{
+  "name": "Internship workflow-1",
+  "nodes": [
+    {
+      "parameters": {
+        "fileSelector": "/my_stuff/datasets/MSRVTT/msrvtt_train_7k_short.json",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        272
+      ],
+      "id": "c2ad90ff-8e7b-44d7-9780-226f7a1595ef",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "fromJson",
+        "destinationKey": "=data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        48,
+        272
+      ],
+      "id": "201b581b-4ba1-426d-971d-d1623c4df8c5",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\n// Ensure consistent structure\nconst blocks = Array.isArray(input) ? input : [input];\nconst output = [];\n\nfor (const block of blocks) {\n  const entries = block.data || [];\n\n  for (const entry of entries) {\n    output.push({\n      json: {\n        video_id: entry.video_id,\n        caption: entry.caption,   // ⬅ FULL ARRAY, NOT SPLIT\n      }\n    });\n  }\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        272
+      ],
+      "id": "85de5230-6f8c-4d82-911d-ce9453c1e46e",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        496,
+        272
+      ],
+      "id": "ed7cae90-4e3a-4b9c-9723-20e816aa4095",
+      "name": "Loop Over Items",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=summarize the following points into a single para, and make sure to give only the summary, nothing else like \"here's the summary\" or \"The provided points consistently describe\":\n\n {{ $json.caption }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        704,
+        288
+      ],
+      "id": "b9d3a4f6-1204-41b7-854f-11173d69d3b3",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        656,
+        480
+      ],
+      "id": "68b600ef-521f-483a-9d5e-2c61c9cff41f",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "NhxOfvOF5ILqxwWe",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8fd6c5a7-a7aa-4129-8652-7a1cfc5efc80",
+              "name": "video_id",
+              "value": "={{ $('Loop Over Items').item.json.video_id }}",
+              "type": "string"
+            },
+            {
+              "id": "bc645c88-e0f8-4043-b74b-0859febb6d10",
+              "name": "output",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1024,
+        288
+      ],
+      "id": "a7acabf6-2f5d-402f-979b-995bf85ecbcc",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "5547ujCug3lviFZI",
+          "mode": "list",
+          "cachedResultName": "internship workflow table",
+          "cachedResultUrl": "/projects/5H61CNjiBsq8tXQQ/datatables/5547ujCug3lviFZI"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "video_id",
+              "keyValue": "={{ $json.video_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "video_id": "={{ $json.video_id }}",
+            "output": "={{ $json.output }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "video_id",
+              "displayName": "video_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        448
+      ],
+      "id": "58eadb75-3fde-42d8-9e62-d794dc0c40dc",
+      "name": "Upsert row(s)"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        272
+      ],
+      "id": "200fddee-c562-449b-b118-c279569219f4",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "5547ujCug3lviFZI",
+          "mode": "list",
+          "cachedResultName": "internship workflow table",
+          "cachedResultUrl": "/projects/5H61CNjiBsq8tXQQ/datatables/5547ujCug3lviFZI"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        752,
+        80
+      ],
+      "id": "509f01df-8f76-4231-b8be-27504a8a6b5c",
+      "name": "Get row(s)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all input items – each item is one row\nconst inputItems = $input.all();\n\nif (inputItems.length === 0) {\n  throw new Error('No input items received');\n}\n\n// Take keys from the first item as CSV headers\nconst headers = Object.keys(inputItems[0].json);\n\n// Helper to escape CSV values\nfunction escapeCsv(value) {\n  if (value === null || value === undefined) return '';\n  return `\"${String(value).replace(/\"/g, '\"\"')}\"`;\n}\n\n// Build CSV lines\nconst lines = [];\n\n// Header row\nlines.push(headers.map(escapeCsv).join(','));\n\n// Data rows\nfor (const item of inputItems) {\n  const row = headers.map(h => escapeCsv(item.json[h]));\n  lines.push(row.join(','));\n}\n\nconst csv = lines.join('\\n');\n\n// Convert to base64 for binary\nconst data = Buffer.from(csv, 'utf8').toString('base64');\n\n// Return single item with binary for Write Binary File\nreturn [\n  {\n    json: {},\n    binary: {\n      data: {\n        data,\n        mimeType: 'text/csv',\n        fileName: 'videos.csv',\n      }\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        80
+      ],
+      "id": "7fff762a-da6c-4a65-acb1-777613c991e9",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/my_stuff/datasets/MSRVTT/msrvtt_train_7k_short.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        80
+      ],
+      "id": "5ae1d31c-7476-48c4-9ac8-15398710ef63",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8eadd132-ee12-45db-bff4-21c8de4d4c60",
+              "name": "video_id",
+              "value": "={{ $json.video_id }}",
+              "type": "string"
+            },
+            {
+              "id": "222160fd-ab6d-48d6-8bde-85e49660e37b",
+              "name": "output",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        960,
+        80
+      ],
+      "id": "abdafd2a-20b4-4227-b1fb-52dfbae24a4c",
+      "name": "Edit Fields1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Upsert row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert row(s)": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b1f1fc7e-ba06-4a77-9b86-d10bc2f5e00c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f571a66d3b8427581d89bd87e9511e178ea339ae53629f9f8732768f5b942426"
+  },
+  "id": "kHFddaeBWZopgALW",
+  "tags": []
+}

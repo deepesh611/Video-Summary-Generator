@@ -1,0 +1,535 @@
+{
+  "name": "Internship workflow-2",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        -16
+      ],
+      "id": "e8acf115-9c01-4214-8333-096a0eff8286",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "/my_stuff/coding/Video-Summary-Generator/notebooks/test_results.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -16
+      ],
+      "id": "2cd7177e-869a-4f2a-8ca6-99b9e417ef9b",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        160,
+        -16
+      ],
+      "id": "6bb1afb4-2e70-4edc-8bfb-74afab351f4f",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        368,
+        -16
+      ],
+      "id": "0ae751cf-d7d0-4866-8661-d251692457b4",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You will be given two text summaries. Compare them and output two separate scores (0–100):\n\nContent Match Score — How fully the Generated Summary covers the important information, ideas, and details present in the Reference Summary. Consider paraphrasing, merging, or implicit meaning as valid coverage. Deduct points only when clearly essential points are missing.\n\nMeaning Similarity Score — How closely both summaries express the same overall meaning, intent, and implications, regardless of structure or phrasing.\n\nDo not rely on word overlap.\nOnly output the scores. No explanations.\n\nSummary 1 (Generated Summary): \"{{ $json.pipeline_summary_output }}\"\nSummary 2 (Reference Summary from Dataset): \"{{ $json.premade_summary }}\"\n\nContent Match Score (0–100):\nMeaning Similarity Score (0–100):\n",
+        "needsFallback": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        640,
+        0
+      ],
+      "id": "33d00f7d-bfb3-4f05-a942-8128221f80f2",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $input.item.json.output.trim();\n\n// Split by newline\nconst lines = text.split(/\\r?\\n/);\n\n// Parse numbers\nconst contentMatch = Number(lines[0]);\nconst meaningSimilarity = Number(lines[1]);\n\nreturn [\n  {\n    json: {\n      content_match_score: contentMatch,\n      meaning_similarity_score: meaningSimilarity\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        176
+      ],
+      "id": "d402e866-ab5c-4799-b142-9183506b422d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6d9bd5e0-c0b6-403c-9226-b81a97234b8a",
+              "name": "video_id",
+              "value": "={{ $('Loop Over Items').item.json.video_id }}",
+              "type": "string"
+            },
+            {
+              "id": "a29aa47f-2d4f-4441-b976-b1ab8abb2934",
+              "name": "premade_summary",
+              "value": "={{ $('Loop Over Items').item.json.premade_summary }}",
+              "type": "string"
+            },
+            {
+              "id": "ddc73e52-1164-4854-9a58-9011e42f5a36",
+              "name": "pipeline_summary_output",
+              "value": "={{ $('Loop Over Items').item.json.pipeline_summary_output }}",
+              "type": "string"
+            },
+            {
+              "id": "cdfb5018-cdf2-4adb-8d42-b456996a3901",
+              "name": "content_match_score",
+              "value": "={{ $json.content_match_score }}",
+              "type": "number"
+            },
+            {
+              "id": "a29bcee4-91b4-4fcb-b682-9b95773db664",
+              "name": "meaning_similarity_score",
+              "value": "={{ $json.meaning_similarity_score }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        176
+      ],
+      "id": "74981d30-38ab-47b7-b1af-3569e73006f0",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "5547ujCug3lviFZI",
+          "mode": "list",
+          "cachedResultName": "internship workflow table",
+          "cachedResultUrl": "/projects/5H61CNjiBsq8tXQQ/datatables/5547ujCug3lviFZI"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "video_id",
+              "keyValue": "={{ $json.video_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "video_id": "={{ $json.video_id }}",
+            "generated_summary": "={{ $json.pipeline_summary_output }}",
+            "content_match_score": "={{ $json.content_match_score }}",
+            "meaning_similarity_score": "={{ $json.meaning_similarity_score }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "video_id",
+              "displayName": "video_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "output",
+              "displayName": "output",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "generated_summary",
+              "displayName": "generated_summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "content_match_score",
+              "displayName": "content_match_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "meaning_similarity_score",
+              "displayName": "meaning_similarity_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        1408,
+        176
+      ],
+      "id": "12efcaec-4ce0-4f66-8a51-e592ddf7cf43",
+      "name": "Upsert row(s)"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "5547ujCug3lviFZI",
+          "mode": "list",
+          "cachedResultName": "internship workflow table",
+          "cachedResultUrl": "/projects/5H61CNjiBsq8tXQQ/datatables/5547ujCug3lviFZI"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "generated_summary",
+              "condition": "isNotEmpty"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        688,
+        -176
+      ],
+      "id": "ae752617-031e-4577-87dc-3d9859c5fd2f",
+      "name": "Get row(s)",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "143e1540-8698-40a5-8a97-9c83cfc47ade",
+              "name": "video_id",
+              "value": "={{ $json.video_id }}",
+              "type": "string"
+            },
+            {
+              "id": "5f9cd305-44ec-4e1b-ba85-2a2d1b7e46e1",
+              "name": "output",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "a49f582d-ecaf-4ca9-b9f6-3e88713ea64d",
+              "name": "generated_summary",
+              "value": "={{ $json.generated_summary }}",
+              "type": "string"
+            },
+            {
+              "id": "fc2786d4-d2df-43ae-ab7d-0841ad1cc5ba",
+              "name": "content_match_score",
+              "value": "={{ $json.content_match_score }}",
+              "type": "number"
+            },
+            {
+              "id": "a5602427-1a5c-4090-b576-87e3d5e7483f",
+              "name": "meaning_similarity_score",
+              "value": "={{ $json.meaning_similarity_score }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        -176
+      ],
+      "id": "15dbbad5-a185-4395-a9ef-7182b651dd13",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Extract JSON from all items\nconst data = items.map(item => item.json);\n\n// Auto-detect all keys across items (CSV header)\nconst headers = [...new Set(data.flatMap(obj => Object.keys(obj)))];\n\n// Build CSV rows\nconst csvRows = [];\n\n// Header row\ncsvRows.push(headers.join(\",\"));\n\n// Data rows\nfor (const row of data) {\n  csvRows.push(\n    headers.map(h => {\n      const val = row[h] ?? \"\";\n      // CSV escape (commas, quotes, newlines)\n      return `\"${String(val).replace(/\"/g, '\"\"')}\"`\n    }).join(\",\")\n  );\n}\n\nconst csvString = csvRows.join(\"\\n\");\n\n// Convert CSV → binary buffer\nconst buffer = Buffer.from(csvString, \"utf-8\");\n\n// Return as binary for Write Binary File node\nreturn [\n  {\n    json: {},\n    binary: {\n      data: {\n        data: buffer.toString(\"base64\"),\n        mimeType: \"text/csv\",\n        fileName: \"summaries.csv\"\n      }\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1072,
+        -176
+      ],
+      "id": "cdf818d0-1a6a-4a36-925b-0e264e3b9821",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/my_stuff/coding/Video-Summary-Generator/notebooks/results.csv",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        -176
+      ],
+      "id": "c38d2a2b-156d-4fe2-8dde-ad5e9d6a52b5",
+      "name": "Read/Write Files from Disk1"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        704,
+        208
+      ],
+      "id": "4d82bd41-a875-4486-bf2f-be1480cc31b9",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "CRwJ8NHjh6lMT2DQ",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemma-3-27b-it",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        576,
+        192
+      ],
+      "id": "a10885e2-5a5d-4bb0-b95c-c5d81d05f345",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "NhxOfvOF5ILqxwWe",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Upsert row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert row(s)": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "afa3f4f9-7b9b-4b6b-b86c-8e57823e642b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f571a66d3b8427581d89bd87e9511e178ea339ae53629f9f8732768f5b942426"
+  },
+  "id": "wbodRI9rTO6mRSId",
+  "tags": []
+}
