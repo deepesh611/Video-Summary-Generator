@@ -1,28 +1,19 @@
-"""
-Video processing pipeline module.
-
-This module contains the deep learning pipeline for processing videos
-and generating summaries. Based on the pipeline from notebooks/notebook1.ipynb.
-"""
 
 import os
-import json
-import glob
-import shutil
-import tempfile
-from pathlib import Path
-from typing import List, Optional
-
 import cv2
 import torch
+import shutil
+import tempfile
+import requests
 import numpy as np
 import torch.nn as nn
-import requests
 import torchvision.models as models
 import torchvision.transforms as transforms
 
 from PIL import Image
+from pathlib import Path
 from dotenv import load_dotenv
+from typing import List, Optional
 from transformers import BlipProcessor, BlipForConditionalGeneration
 
 # Load environment variables
@@ -58,20 +49,6 @@ class FrameImportanceLSTM(nn.Module):
 
 
 def extract_frames(video_path: str, output_dir: str, frame_skip: int = 30) -> List[str]:
-    """
-    Extract frames from video file.
-    
-    Args:
-        video_path: Path to the input video file
-        output_dir: Directory to save extracted frames
-        frame_skip: Extract every Nth frame (default: 30)
-        
-    Returns:
-        List of paths to extracted frame images
-        
-    Raises:
-        Exception: If video cannot be opened or processed
-    """
     os.makedirs(output_dir, exist_ok=True)
     
     vidcap = cv2.VideoCapture(video_path)
@@ -99,16 +76,6 @@ def extract_frames(video_path: str, output_dir: str, frame_skip: int = 30) -> Li
 
 
 def extract_features(frame_files: List[str], device: torch.device) -> np.ndarray:
-    """
-    Extract feature vectors from frames using ResNet50.
-    
-    Args:
-        frame_files: List of paths to frame images
-        device: Torch device (CPU or CUDA)
-        
-    Returns:
-        numpy array of feature vectors
-    """
     # Load pretrained ResNet (remove last fully-connected layer)
     resnet = models.resnet50(weights=True)
     resnet.eval()
@@ -147,18 +114,7 @@ def select_key_frames(
     threshold: float = 0.5,
     device: torch.device = None
 ) -> List[str]:
-    """
-    Select key frames based on importance scores from LSTM model.
-    
-    Args:
-        frame_files: List of paths to all extracted frames
-        features: Feature vectors for each frame
-        threshold: Threshold for selecting frames (default: 0.5)
-        device: Torch device (CPU or CUDA)
-        
-    Returns:
-        List of paths to selected key frames
-    """
+
     if device is None:
         device = DEVICE
     
@@ -260,7 +216,7 @@ def summarize_with_api(video_summary_text: str) -> Optional[str]:
                 "model": model_name,
                 "messages": [{
                     "role": "user",
-                    "content": f'''Rewrite and summarize this video breakdown without missing any key factors for a general audience. Only give the summary, no other intro or outro.:
+                    "content": f'''Rewrite and summarize this video breakdown without missing any key factors for a general audience. Only give the summary, no other intro or outro, and do not mention like 'scene-1'.:
 
 {video_summary_text}'''
                 }]
