@@ -33,4 +33,9 @@ trial
 
 .devcontainer/
 dataset
-notebooks
+.devcontainer
+
+# Misci
+temp_frames_*
+scripts
+

@@ -6,9 +6,12 @@ dotenv
 fastapi
 uvicorn
 requests
+accelerate
 torchvision
+bitsandbytes
 transformers
 opencv-python
 python-dotenv
 python-multipart
 streamlit>=1.28.0
+matplotlib
