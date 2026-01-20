@@ -31,11 +31,10 @@ app/.streamlit/secrets.toml
 # Trial Folders
 trial
 
-.devcontainer/
-dataset
-.devcontainer
-
 # Misci
 temp_frames_*
 scripts
+backup
+dataset
 
+notebooks1

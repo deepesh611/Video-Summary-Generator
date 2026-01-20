@@ -82,22 +82,30 @@ async def health_check():
 
 
 @app.post("/process_upload")
-async def process_upload(file: UploadFile = File(...)):
+async def process_upload(
+    file: UploadFile = File(...),
+    clip_duration: float = 2.0,
+    target_moments: int = 20,
+    whisper_model: str = "base"
+):
     """
-    Process an uploaded video file and generate a summary.
+    Process an uploaded video file and generate a multimodal summary.
     
     This endpoint:
     1. Accepts a video file as multipart/form-data
     2. Creates a unique run ID
     3. Saves the video to backend/uploads/{run_id}/input_video.{ext}
-    4. Runs the pipeline to generate a summary
+    4. Runs the MULTIMODAL pipeline to generate a summary
     5. Returns the summary and run_id
     
     Args:
         file: The uploaded video file
+        clip_duration: Duration of each time-based clip in seconds (default: 2.0)
+        target_moments: Number of key moments to select (default: 20)
+        whisper_model: Whisper model size - tiny/base/small/medium (default: base)
         
     Returns:
-        JSONResponse: Contains summary text and run_id
+        JSONResponse: Contains multimodal summary text and run_id
         
     Raises:
         HTTPException: If file validation fails or processing error occurs
@@ -137,10 +145,15 @@ async def process_upload(file: UploadFile = File(...)):
         with open(input_video_path, "wb") as f:
             f.write(file_content)
         
-        # Run the pipeline to generate summary
+        # Run the MULTIMODAL pipeline to generate summary
         # Note: This may take some time depending on video length and processing complexity
         try:
-            summary = run_pipeline(str(input_video_path))
+            summary = run_pipeline(
+                str(input_video_path),
+                clip_duration=clip_duration,
+                target_moments=target_moments,
+                whisper_model=whisper_model
+            )
             
             # Validate that pipeline returned a summary
             if not summary or not isinstance(summary, str):
