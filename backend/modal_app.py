@@ -4,21 +4,39 @@ import modal
 # Define the image with all dependencies and local source code
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("ffmpeg", "libsm6", "libxext6")
+    .apt_install(
+        "ffmpeg",      # Audio/video processing
+        "libsm6",      # OpenCV dependency
+        "libxext6",    # OpenCV dependency
+        "libsndfile1"  # Audio file handling (for librosa)
+    )
     .pip_install(
+        # API framework
         "fastapi>=0.104.0",
         "uvicorn[standard]>=0.24.0",
         "python-dotenv>=1.0.0",
         "python-multipart>=0.0.6",
+        
+        # Deep learning
         "torch>=2.0.0",
         "torchvision>=0.15.0",
         "transformers>=4.30.0",
+        "accelerate",
+        
+        # Computer vision
         "opencv-python>=4.8.0",
         "pillow>=10.0.0",
+        
+        # Audio processing (NEW for multimodal)
+        "openai-whisper>=20230314",
+        "librosa>=0.10.0",
+        "soundfile>=0.12.0",
+        
+        # Utilities
         "numpy>=1.24.0",
         "requests>=2.31.0",
     )
-    # Mount the backend directory to access main.py and pipeline.py
+    # Mount the backend directory to access main.py, pipeline.py, video.py, audio.py
     .add_local_dir("backend", "/backend")
 )
 

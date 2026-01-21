@@ -3,9 +3,24 @@ import uuid
 import shutil
 import requests
 import streamlit as st
+import logging
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
+from dotenv import load_dotenv
+
+# Configure logging for terminal output
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+# Load environment variables from backend/.env file
+env_path = Path(__file__).parent.parent / "backend" / ".env"
+load_dotenv(dotenv_path=env_path)
+logger.info(f"Loading environment from: {env_path}")
 
 # Page configuration
 st.set_page_config(
@@ -19,9 +34,12 @@ UPLOADS_DIR = Path(__file__).parent / "uploads"
 SUPPORTED_FORMATS = [".mp4", ".mkv", ".mov"]
 
 # Backend API Configuration
-# Set this to your Modal deployment URL after deploying
-# Format: https://your-username--video-summary-generator-fastapi-app.modal.run
-BACKEND_API_URL = os.getenv("BACKEND_API_URL", st.secrets.get("BACKEND_API_URL", ""))
+# Reads from .env file or Streamlit Cloud secrets
+try:
+    BACKEND_API_URL = os.getenv("BACKEND_API_URL") or st.secrets.get("BACKEND_API_URL", "")
+except Exception:
+    # Fallback if secrets file doesn't exist
+    BACKEND_API_URL = os.getenv("BACKEND_API_URL", "")
 
 
 def ensure_uploads_directory():
@@ -79,16 +97,26 @@ def process_video_api(file_info: dict, api_url: str):
         file_info: Dictionary containing file information
         api_url: Backend API URL
     """
+    logger.info("="*60)
+    logger.info("STARTING VIDEO PROCESSING")
+    logger.info("="*60)
+    
     file_path = file_info.get("file_path")
     if not file_path or not Path(file_path).exists():
+        logger.error(f"Video file not found at: {file_path}")
         st.error("Video file not found. Please upload again.")
         return
+    
+    logger.info(f"Video file: {file_info.get('filename', 'unknown')}")
+    logger.info(f"File size: {file_info.get('size', 'unknown')}")
+    logger.info(f"Backend URL: {api_url}")
     
     # Show progress
     progress_bar = st.progress(0)
     status_text = st.empty()
     
     try:
+        logger.info("Step 1: Uploading video to backend...")
         status_text.text("📤 Uploading video to backend...")
         progress_bar.progress(10)
         
@@ -96,60 +124,75 @@ def process_video_api(file_info: dict, api_url: str):
         with open(file_path, "rb") as f:
             files = {"file": (file_info["filename"], f, "video/mp4")}
             
+            logger.info("Step 2: Sending request to backend API...")
             status_text.text("🔄 Processing video (this may take several minutes)...")
             progress_bar.progress(30)
             
             # Send request to backend
+            logger.info(f"POST {api_url}/process_upload")
             response = requests.post(
                 f"{api_url}/process_upload",
                 files=files,
                 timeout=1800  # 30 minute timeout
             )
             
+            logger.info(f"Response status code: {response.status_code}")
             progress_bar.progress(90)
             
             # Check response
             if response.status_code == 200:
+                logger.info("Step 3: Processing successful!")
                 result = response.json()
                 
-                # Debug: Log the response structure (optional, can remove later)
-                # print(f"Response keys: {result.keys()}")
-                # print(f"Summary present: {'summary' in result}")
+                logger.info(f"Response received - Run ID: {result.get('run_id', 'N/A')}")
+                logger.info(f"Summary length: {len(result.get('summary', ''))} characters")
                 
                 # Validate that summary exists in response
                 if "summary" not in result:
+                    logger.error(f"Response missing 'summary' key. Keys: {result.keys()}")
                     st.error(f"❌ Response missing 'summary' key. Response: {result}")
                     status_text.text("❌ Invalid response format")
                     return
                 
                 # Store result and trigger rerun to display summary
+                logger.info("Storing result in session state")
                 st.session_state.processing_result = result
                 progress_bar.progress(100)
                 status_text.text("✅ Processing complete!")
+                logger.info("="*60)
+                logger.info("VIDEO PROCESSING COMPLETE")
+                logger.info("="*60)
                 st.rerun()
             else:
                 # Try to get error detail from response
+                logger.error(f"Backend returned error status: {response.status_code}")
                 try:
                     error_data = response.json()
                     error_msg = error_data.get("detail", error_data.get("message", "Unknown error"))
+                    logger.error(f"Error details: {error_msg}")
                 except:
                     error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+                    logger.error(f"Raw error: {error_msg}")
                 
                 st.error(f"❌ Processing failed: {error_msg}")
                 status_text.text("❌ Error occurred")
                 
     except requests.exceptions.Timeout:
+        logger.error("Request timed out after 30 minutes")
         st.error("⏱️ Request timed out. Video processing may take longer than expected.")
         status_text.text("⏱️ Timeout")
     except requests.exceptions.RequestException as e:
+        logger.error(f"Request exception: {str(e)}")
         st.error(f"❌ Connection error: {str(e)}")
         status_text.text("❌ Connection error")
     except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         st.error(f"❌ Unexpected error: {str(e)}")
         status_text.text("❌ Error")
     finally:
         progress_bar.empty()
         status_text.empty()
+        logger.info("Cleaned up progress indicators")
 
 
 def cleanup_old_uploads(max_age_hours=24):

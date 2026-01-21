@@ -1,268 +1,269 @@
 import os
-import cv2
 import time
-import torch
 import shutil
 import tempfile
 import requests
-import numpy as np
-import torch.nn as nn
-import torchvision.models as models
-import torchvision.transforms as transforms
-import warnings
 
-from PIL import Image
 from pathlib import Path
+from typing import Optional
 from dotenv import load_dotenv
-from typing import List, Optional
 
-# Load environment variables
-load_dotenv()
+from video import (
+    extract_frames,
+    extract_features,
+    select_key_frames,
+    caption_frames,
+    DEVICE
+)
+from audio import (
+    extract_audio_segment,
+    transcribe_audio_segment,
+    get_video_duration
+)
 
-# Device configuration
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-class FrameImportanceLSTM(nn.Module):
+def create_synchronized_clips(video_path: str, clip_duration: float = 2.0):
     """
-    LSTM model for scoring frame importance.
+    Create synchronized (frame, audio) clips at regular time intervals.
     
-    This model takes frame features and outputs importance scores
-    for selecting key frames from the video.
-    """
-    
-    def __init__(self, input_size=1024, hidden_size=256, num_layers=2):
-        super(FrameImportanceLSTM, self).__init__()
-        self.lstm = nn.LSTM(
-            input_size, 
-            hidden_size, 
-            num_layers, 
-            batch_first=True, 
-            bidirectional=True
-        )
-        self.fc = nn.Linear(hidden_size * 2, 1)
-
-    def forward(self, x):
-        h, _ = self.lstm(x)
-        scores = torch.sigmoid(self.fc(h)).squeeze(-1)
-        return scores
-
-
-def extract_frames(video_path: str, output_dir: str, frame_skip: int = 30) -> List[str]:
-    os.makedirs(output_dir, exist_ok=True)
-    
-    vidcap = cv2.VideoCapture(video_path)
-    if not vidcap.isOpened():
-        raise Exception(f"Failed to open video file: {video_path}")
-    
-    success, image = vidcap.read()
-    count = 0
-    frame_files = []
-    
-    while success:
-        if count % frame_skip == 0:
-            frame_path = os.path.join(output_dir, f"frame_{count}.jpg")
-            cv2.imwrite(frame_path, image)
-            frame_files.append(frame_path)
-        success, image = vidcap.read()
-        count += 1
-    
-    vidcap.release()
-    
-    if len(frame_files) == 0:
-        raise Exception("No frames were extracted from the video")
-    
-    return sorted(frame_files)
-
-
-def extract_features(frame_files: List[str], device: torch.device) -> np.ndarray:
-    # Load pretrained GoogLeNet and disable auxiliary classifiers
-    try:
-        weights = models.GoogLeNet_Weights.DEFAULT
-        googlenet = models.googlenet(weights=weights, aux_logits=True)
-    except Exception:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            googlenet = models.googlenet(pretrained=True, aux_logits=True)
-
-    googlenet.eval()
-    googlenet = googlenet.to(device)
-
-    preprocess = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
-    ])
-
-    features = []
-
-    for path in frame_files:
-        image = Image.open(path).convert("RGB")
-        input_tensor = preprocess(image).unsqueeze(0).to(device)
-
-        with torch.no_grad():
-            x = input_tensor
-            for name, module in googlenet.named_children():
-                if name in ('aux1', 'aux2'):
-                    continue
-                if name == 'fc':
-                    break
-                x = module(x)
-
-            if x.dim() > 2:
-                vector = torch.flatten(x, 1).cpu().numpy().flatten()
-            else:
-                vector = x.cpu().numpy().flatten()
-
-        features.append(vector)
-
-    return np.array(features)
-
-
-def select_key_frames(
-    frame_files: List[str], 
-    features: np.ndarray, 
-    threshold: float = 0.5,
-    device: torch.device = None
-) -> List[str]:
-    """
-    Select key frames using a pre-trained video model (R(2+1)D).
-    Falls back to uniform sampling if model fails.
+    This is the foundation of the multimodal approach: instead of extracting
+    frames based on FPS, we extract based on TIME, ensuring audio and visual
+    are always aligned.
     
     Args:
-        frame_files: List of paths to frame images
-        features: (Unused) Feature vectors
-        threshold: (Unused) Threshold
-        device: Torch device
+        video_path: Path to input video
+        clip_duration: Duration of each audio segment in seconds (default: 2.0)
         
     Returns:
-        List of selected key frame paths
+        List of dictionaries with 'timestamp', 'frame_path', 'audio_path'
     """
-    if device is None:
-        device = DEVICE
+    import cv2
     
-    num_frames = len(frame_files)
-    target_count = 25  # Aim for 25 frames
+    # Get video properties
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration = total_frames / fps
+    cap.release()
     
-    # Fallback to uniform sampling if too few frames
-    if num_frames <= target_count:
-        return frame_files
+    # Create temporary directory for clips
+    temp_dir = tempfile.mkdtemp(prefix="multimodal_clips_")
+    frames_dir = os.path.join(temp_dir, "frames")
+    audio_dir = os.path.join(temp_dir, "audio")
+    os.makedirs(frames_dir, exist_ok=True)
+    os.makedirs(audio_dir, exist_ok=True)
     
-    try:
-        # Load pre-trained R(2+1)D model
-        from torchvision.models.video import r2plus1d_18, R2Plus1D_18_Weights
+    clips = []
+    current_time = 0.0
+    clip_idx = 0
+    
+    print(f"Creating synchronized clips (duration: {duration:.1f}s, clip_duration: {clip_duration}s)...")
+    
+    # Extract clips at regular time intervals
+    cap = cv2.VideoCapture(video_path)
+    
+    while current_time < duration:
+        # Extract frame at this timestamp
+        frame_num = int(current_time * fps)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+        ret, frame = cap.read()
         
-        weights = R2Plus1D_18_Weights.DEFAULT
-        model = r2plus1d_18(weights=weights)
-        model = model.to(device)
-        model.eval()
+        if not ret:
+            break
         
-        # Preprocessing for R(2+1)D (expects 3x16xHxW)
-        preprocess = transforms.Compose([
-            transforms.Resize(128),
-            transforms.CenterCrop(112),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.43216, 0.394666, 0.37645],
-                               std=[0.22803, 0.22145, 0.216989])
-        ])
+        # Save frame
+        frame_path = os.path.join(frames_dir, f"frame_{clip_idx:04d}.jpg")
+        cv2.imwrite(frame_path, frame)
         
-        # Score frames using temporal clips
-        clip_size = 16
-        scores = []
+        # Extract audio segment [current_time, current_time + clip_duration]
+        audio_path = os.path.join(audio_dir, f"audio_{clip_idx:04d}.wav")
         
-        for i in range(0, num_frames, clip_size // 2):  # 50% overlap
-            clip_frames = frame_files[i:i+clip_size]
-            
-            # Pad if needed
-            while len(clip_frames) < clip_size:
-                clip_frames.append(clip_frames[-1])
-            
-            # Load and preprocess frames
-            clip_tensors = []
-            for frame_path in clip_frames:
-                img = Image.open(frame_path).convert('RGB')
-                clip_tensors.append(preprocess(img))
-            
-            # Stack to (C, T, H, W) format
-            clip_tensor = torch.stack(clip_tensors, dim=1).unsqueeze(0).to(device)
-            
-            # Get prediction confidence
-            with torch.no_grad():
-                output = model(clip_tensor)
-                confidence = torch.softmax(output, dim=1).max().item()
-            
-            # Assign score to middle frame of clip
-            mid_idx = i + clip_size // 2
-            if mid_idx < num_frames:
-                scores.append((mid_idx, confidence))
+        try:
+            extract_audio_segment(
+                video_path,
+                audio_path,
+                start_time=current_time,
+                duration=min(clip_duration, duration - current_time)
+            )
+        except Exception as e:
+            print(f"Warning: Failed to extract audio at {current_time}s: {e}")
+            audio_path = None
         
-        # Sort by score and select top frames
-        scores.sort(key=lambda x: x[1], reverse=True)
-        selected_indices = sorted([idx for idx, _ in scores[:target_count]])
+        clips.append({
+            'timestamp': current_time,
+            'frame_path': frame_path,
+            'audio_path': audio_path,
+            'clip_idx': clip_idx
+        })
         
-        return [frame_files[i] for i in selected_indices if i < num_frames]
-        
-    except Exception as e:
-        print(f"R(2+1)D model failed: {e}. Falling back to uniform sampling.")
-        # Fallback to uniform sampling
-        indices = np.linspace(0, num_frames - 1, target_count, dtype=int)
-        return [frame_files[i] for i in indices]
+        current_time += clip_duration
+        clip_idx += 1
+    
+    cap.release()
+    
+    print(f"Created {len(clips)} synchronized clips")
+    return clips, temp_dir
 
 
-def caption_frames(
-    frame_files: List[str], 
-    device: torch.device = None
-) -> List[str]:
+def generate_multimodal_captions(clips: list, whisper_model: str = "base"):
     """
-    Generate captions for frames using BLIP-2 model.
+    Generate captions for each multimodal moment combining visual and audio.
     
     Args:
-        frame_files: List of paths to frame images
-        device: Torch device (CPU or CUDA)
+        clips: List of clip dictionaries with frame_path and audio_path
+        whisper_model: Whisper model size (tiny, base, small, medium, large)
         
     Returns:
-        List of captions for each frame
+        List of multimodal captions with timestamps
     """
-    if device is None:
-        device = DEVICE
-    
-    # Load BLIP-2 model and processor (better accuracy than BLIP)
     from transformers import Blip2Processor, Blip2ForConditionalGeneration
+    from PIL import Image
+    import torch
     
-    print("Loading BLIP-2 model...")
+    # Load BLIP-2 for visual captioning
+    print("Loading BLIP-2 model for visual captioning...")
     processor = Blip2Processor.from_pretrained("Salesforce/blip2-opt-2.7b")
-    caption_model = Blip2ForConditionalGeneration.from_pretrained(
+    blip2_model = Blip2ForConditionalGeneration.from_pretrained(
         "Salesforce/blip2-opt-2.7b",
-        dtype=torch.float16
+        torch_dtype=torch.float16
     )
-    caption_model = caption_model.to(device)
-    caption_model.eval()
+    blip2_model = blip2_model.to(DEVICE)
+    blip2_model.eval()
     
-    def caption_frame(image_path: str) -> str:
-        """Generate caption for a single frame."""
-        raw_image = Image.open(image_path).convert('RGB')
-        inputs = processor(raw_image, return_tensors="pt").to(device)
+    multimodal_captions = []
+    
+    for clip in clips:
+        timestamp = clip['timestamp']
+        frame_path = clip['frame_path']
+        audio_path = clip['audio_path']
+        
+        # Get visual caption
+        image = Image.open(frame_path).convert('RGB')
+        inputs = processor(images=image, return_tensors="pt").to(DEVICE)
         
         with torch.no_grad():
-            generated_ids = caption_model.generate(**inputs, max_length=50)
-            caption = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+            generated_ids = blip2_model.generate(**inputs, max_length=50)
+            visual_caption = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
         
-        return caption
+        # Get audio transcription
+        audio_text = ""
+        if audio_path and os.path.exists(audio_path):
+            try:
+                audio_text = transcribe_audio_segment(audio_path, model_size=whisper_model)
+            except Exception as e:
+                print(f"Warning: Audio transcription failed at {timestamp}s: {e}")
+                audio_text = ""
+        
+        # Combine visual and audio
+        if audio_text:
+            # Both visual and audio available
+            combined_caption = f"{visual_caption}. Audio: \"{audio_text}\""
+        else:
+            # Only visual available
+            combined_caption = visual_caption
+        
+        multimodal_captions.append({
+            'timestamp': timestamp,
+            'caption': combined_caption,
+            'visual': visual_caption,
+            'audio': audio_text
+        })
     
-    # Generate captions for all key frames
-    video_summary = []
-    for idx, frame_path in enumerate(frame_files):
-        caption = caption_frame(frame_path)
-        video_summary.append(f"Scene {idx+1}: {caption}")
-    
-    return video_summary
+    return multimodal_captions
 
 
-def summarize_with_api(video_summary_text: str) -> Optional[str]:
+def select_key_moments(multimodal_captions: list, target_count: int = 20):
+    """
+    Select key moments from multimodal captions.
+    
+    For now, uses simple uniform sampling. Can be enhanced later with:
+    - Diversity-based selection using embeddings
+    - Importance scoring based on audio/visual content
+    - Scene change detection
+    
+    Args:
+        multimodal_captions: List of caption dictionaries
+        target_count: Number of key moments to select
+        
+    Returns:
+        List of selected key moments
+    """
+    import numpy as np
+    
+    total_moments = len(multimodal_captions)
+    
+    if total_moments <= target_count:
+        return multimodal_captions
+    
+    # Uniform sampling for now
+    indices = np.linspace(0, total_moments - 1, target_count, dtype=int)
+    selected_moments = [multimodal_captions[i] for i in indices]
+    
+    print(f"Selected {len(selected_moments)} key moments from {total_moments} total moments")
+    return selected_moments
+
+
+def generate_multimodal_summary(key_moments: list) -> str:
+    """
+    Generate final summary from multimodal key moments.
+    
+    Args:
+        key_moments: List of key moment dictionaries with timestamps and captions
+        
+    Returns:
+        Final multimodal summary text
+    """
+    # Format timeline
+    timeline = []
+    for moment in key_moments:
+        timeline.append(f"[{moment['timestamp']:.1f}s] {moment['caption']}")
+    
+    timeline_text = "\n".join(timeline)
+    
+    # Create a structured prompt for the LLM
+    prompt = f"""You are analyzing a video. Below is a timeline of key moments with visual descriptions and audio transcriptions.
+
+TIMELINE:
+{timeline_text}
+
+Create a concise summary (not more than 5 sentences) that:
+- Describes what happens in the video in a natural narrative flow
+- Integrates visual and audio information smoothly
+- Does NOT include timestamps (like "at 2 seconds" or "[2.0s]")
+- Does NOT quote dialogue directly (paraphrase instead)
+- Focuses on the main events, actions, and overall story
+
+Write as if you're describing the video to someone who hasn't seen it.
+
+SUMMARY:"""
+    
+    # Try to use LLM API for better summarization
+    print("Attempting to generate narrative summary with LLM...")
+    llm_summary = summarize_with_api(prompt)
+    
+    if llm_summary:
+        # LLM summarization successful
+        print("✓ LLM summary generated")
+        return f"Video Summary:\n\n{llm_summary}\n\n---\n\nDetailed Timeline:\n{timeline_text}"
+    else:
+        # Fallback: Use formatted timeline only
+        print("⚠ LLM unavailable, using timeline format")
+        return f"Video Summary:\n\n{timeline_text}"
+
+
+def summarize_with_api(prompt: str) -> Optional[str]:
+    """
+    Send a prompt to LLM API and get a summary.
+    
+    This is a generic function that can be used for any summarization task.
+    The caller provides the complete prompt.
+    
+    Args:
+        prompt: The complete prompt to send to the LLM
+        
+    Returns:
+        LLM-generated summary or None if API not configured
+    """
     api_url = os.getenv("API_URL")
     api_key = os.getenv("API_KEY")
     model_name = os.getenv("MODEL_NAME", "tngtech/deepseek-r1t2-chimera:free")
@@ -287,13 +288,7 @@ def summarize_with_api(video_summary_text: str) -> Optional[str]:
                     "model": model_name,
                     "messages": [{
                         "role": "user",
-                        "content": f'''Analyze the following sequence of frame captions from a video and provide a detailed, comprehensive summary.
-Focus on capturing specific actions, objects, and the progression of events.
-Do not use phrases like "The video shows" or "Scene 1".
-Just describe what happens in the video in a continuous narrative.
-
-Captions:
-{video_summary_text}'''
+                        "content": prompt  # Use the provided prompt directly
                     }]
                 },
                 timeout=60  # 60 second timeout
@@ -340,24 +335,33 @@ Captions:
     return video_summary_text
 
 
-def run_pipeline(video_path: str, frame_skip: int = 30, importance_threshold: float = 0.5) -> str:
+
+def run_pipeline(
+    video_path: str, 
+    clip_duration: float = 2.0,
+    target_moments: int = 20,
+    whisper_model: str = "base"
+) -> str:
     """
-    Run the complete video-to-summary pipeline.
+    Run the complete MULTIMODAL video-to-summary pipeline.
+    
+    This pipeline processes video and audio TOGETHER at each moment in time,
+    creating a truly multimodal understanding of the video.
     
     Pipeline steps:
-    1. Extract frames from video
-    2. Extract features using GoogLeNet
-    3. Select key frames using R(2+1)D model
-    4. Generate captions for key frames using BLIP-2
-    5. Optionally summarize using OpenRouter API
-
+    1. Create synchronized (frame, audio) clips at regular time intervals
+    2. Generate multimodal captions combining visual (BLIP-2) and audio (Whisper)
+    3. Select key moments from all multimodal captions
+    4. Generate final summary from key moments
+    
     Args:
         video_path: Path to the input video file
-        frame_skip: Extract every Nth frame (default: 30)
-        importance_threshold: Threshold for frame selection (default: 0.5)
+        clip_duration: Duration of each time-based clip in seconds (default: 2.0)
+        target_moments: Number of key moments to select (default: 20)
+        whisper_model: Whisper model size - tiny/base/small/medium/large (default: base)
         
     Returns:
-        str: The generated summary text
+        str: The generated multimodal summary text
         
     Raises:
         FileNotFoundError: If video_path does not exist
@@ -368,51 +372,43 @@ def run_pipeline(video_path: str, frame_skip: int = 30, importance_threshold: fl
     if not video_file.exists():
         raise FileNotFoundError(f"Video file not found: {video_path}")
     
-    # Create temporary directory for processing
-    temp_dir = tempfile.mkdtemp(prefix="video_pipeline_")
-    frames_dir = os.path.join(temp_dir, "frames")
+    temp_dir = None
     
     try:
-        # Step 1: Extract frames from video
-        print(f"Extracting frames from video...")
-        frame_files = extract_frames(video_path, frames_dir, frame_skip)
-        print(f"Extracted {len(frame_files)} frames")
+        print("="*60)
+        print("MULTIMODAL VIDEO UNDERSTANDING PIPELINE")
+        print("="*60)
         
-        # Step 2: Extract features using GoogLeNet
-        print(f"Extracting features using GoogLeNet...")
-        features = extract_features(frame_files, DEVICE)
-        print(f"Extracted features with shape: {features.shape}")
+        # Step 1: Create synchronized (frame, audio) clips
+        print(f"\n[1/4] Creating synchronized clips...")
+        clips, temp_dir = create_synchronized_clips(video_path, clip_duration)
+        print(f"✓ Created {len(clips)} time-based multimodal clips")
         
-        # Step 3: Select key frames using R(2+1)D model
-        print(f"Selecting key frames with R(2+1)D...")
-        key_frames = select_key_frames(
-            frame_files, 
-            features, 
-            threshold=importance_threshold,
-            device=DEVICE
-        )
-        print(f"Selected {len(key_frames)} key frames")
+        # Step 2: Generate multimodal captions
+        print(f"\n[2/4] Generating multimodal captions...")
+        print(f"  - Visual: BLIP-2")
+        print(f"  - Audio: Whisper ({whisper_model})")
+        multimodal_captions = generate_multimodal_captions(clips, whisper_model)
+        print(f"✓ Generated {len(multimodal_captions)} multimodal captions")
         
-        # Step 4: Generate captions for key frames using BLIP-2
-        print(f"Generating captions for key frames with BLIP-2...")
-        video_summary_list = caption_frames(key_frames, DEVICE)
+        # Step 3: Select key moments
+        print(f"\n[3/4] Selecting key moments...")
+        key_moments = select_key_moments(multimodal_captions, target_count=target_moments)
+        print(f"✓ Selected {len(key_moments)} key moments")
         
-        # Combine captions into text
-        video_summary_text = "\n".join(video_summary_list)
+        # Step 4: Generate final summary
+        print(f"\n[4/4] Generating final summary...")
+        final_summary = generate_multimodal_summary(key_moments)
+        print(f"✓ Summary generated")
         
-        # Step 5: Optionally summarize using OpenRouter API
-        print(f"Summarizing with OpenRouter API...")
-        final_summary = summarize_with_api(video_summary_text)
-        
-        # If API summarization failed or is not configured, use combined captions
-        if final_summary is None:
-            # Fallback: Use a simple combination of captions
-            final_summary = "Video Summary:\n\n" + video_summary_text
+        print("\n" + "="*60)
+        print("PIPELINE COMPLETE")
+        print("="*60)
         
         return final_summary.strip()
         
     finally:
         # Clean up temporary directory
-        if os.path.exists(temp_dir):
+        if temp_dir and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
-            print(f"Cleaned up temporary directory: {temp_dir}")
+            print(f"\n✓ Cleaned up temporary directory: {temp_dir}")
