@@ -220,14 +220,50 @@ def generate_multimodal_summary(key_moments: list) -> str:
     
     timeline_text = "\n".join(timeline)
     
-    # For now, return formatted timeline
-    # Can be enhanced with LLM summarization later
-    summary = f"Multimodal Video Summary:\n\n{timeline_text}"
+    # Create a structured prompt for the LLM
+    prompt = f"""You are analyzing a video. Below is a timeline of key moments with visual descriptions and audio transcriptions.
+
+TIMELINE:
+{timeline_text}
+
+Create a concise summary (not more than 5 sentences) that:
+- Describes what happens in the video in a natural narrative flow
+- Integrates visual and audio information smoothly
+- Does NOT include timestamps (like "at 2 seconds" or "[2.0s]")
+- Does NOT quote dialogue directly (paraphrase instead)
+- Focuses on the main events, actions, and overall story
+
+Write as if you're describing the video to someone who hasn't seen it.
+
+SUMMARY:"""
     
-    return summary
+    # Try to use LLM API for better summarization
+    print("Attempting to generate narrative summary with LLM...")
+    llm_summary = summarize_with_api(prompt)
+    
+    if llm_summary:
+        # LLM summarization successful
+        print("✓ LLM summary generated")
+        return f"Video Summary:\n\n{llm_summary}\n\n---\n\nDetailed Timeline:\n{timeline_text}"
+    else:
+        # Fallback: Use formatted timeline only
+        print("⚠ LLM unavailable, using timeline format")
+        return f"Video Summary:\n\n{timeline_text}"
 
 
-def summarize_with_api(video_summary_text: str) -> Optional[str]:
+def summarize_with_api(prompt: str) -> Optional[str]:
+    """
+    Send a prompt to LLM API and get a summary.
+    
+    This is a generic function that can be used for any summarization task.
+    The caller provides the complete prompt.
+    
+    Args:
+        prompt: The complete prompt to send to the LLM
+        
+    Returns:
+        LLM-generated summary or None if API not configured
+    """
     api_url = os.getenv("API_URL")
     api_key = os.getenv("API_KEY")
     model_name = os.getenv("MODEL_NAME", "tngtech/deepseek-r1t2-chimera:free")
@@ -252,13 +288,7 @@ def summarize_with_api(video_summary_text: str) -> Optional[str]:
                     "model": model_name,
                     "messages": [{
                         "role": "user",
-                        "content": f'''Analyze the following sequence of frame captions from a video and provide a detailed, comprehensive summary.
-Focus on capturing specific actions, objects, and the progression of events.
-Do not use phrases like "The video shows" or "Scene 1".
-Just describe what happens in the video in a continuous narrative.
-
-Captions:
-{video_summary_text}'''
+                        "content": prompt  # Use the provided prompt directly
                     }]
                 },
                 timeout=60  # 60 second timeout
