@@ -6,31 +6,33 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-orange.svg)
 ![Modal](https://img.shields.io/badge/Modal-Serverless-purple.svg)
 
-A deep learning-based application that generates text summaries from video inputs. The project features a **Streamlit** frontend for video upload and a **FastAPI** backend deployed on **Modal** that processes videos through a sophisticated ML pipeline to generate summaries.
+A **multimodal deep learning** application that generates intelligent text summaries from video inputs by analyzing both **visual and audio content together**. The project features a **Streamlit** frontend for video upload and a **FastAPI** backend deployed on **Modal** that processes videos through a sophisticated multimodal ML pipeline combining computer vision and speech recognition.
 
 ## 🎯 Features
 
 - **🎥 Video Upload Interface**: User-friendly Streamlit frontend supporting `.mp4`, `.mkv`, and `.mov` formats
-- **🧠 Intelligent Frame Extraction**: Automatically extracts and selects key frames from videos
-- **🤖 Deep Learning Pipeline**:
-  - Frame feature extraction using **GoogLeNet**
-  - Key frame selection using **R(2+1)D** video model
-  - Caption generation using **BLIP-2** (Salesforce/blip2-opt-2.7b)
-  - Optional API-based final summarization with OpenRouter
+- **🎭 Multimodal Understanding**: Processes **visual and audio content together** at synchronized time intervals
+- **🤖 Advanced Deep Learning Pipeline**:
+  - **Visual Analysis**: Frame extraction and captioning using **BLIP-2** (Salesforce/blip2-opt-2.7b)
+  - **Audio Analysis**: Speech transcription using **OpenAI Whisper** (multiple model sizes)
+  - **Synchronized Processing**: Time-based clip extraction ensuring audio-visual alignment
+  - **Intelligent Selection**: Key moment selection from multimodal captions
+  - **Narrative Generation**: Optional LLM-based summarization via OpenRouter API
 - **☁️ Cloud Deployment**: Backend hosted on **Modal** (serverless with GPU support), frontend on **Streamlit Cloud**
 - **🧹 Automatic Cleanup**: Temporary files and old uploads are automatically managed
 - **🔒 Secure Configuration**: Environment-based configuration for API keys and secrets
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────┐          ┌──────────────────┐          ┌─────────────────┐
-│  Streamlit      │          │   Modal          │          │   ML Pipeline   │
-│  Frontend       │────────▶│   Backend         │────────▶│   (PyTorch)     │
-│  (Cloud/Local)  │  HTTP    │   (FastAPI)      │          │   • GoogLeNet   │
-│                 │          │   • GPU Support  │          │   • R(2+1)D     │
-│                 │          │   • Auto-scaling │          │   • BLIP-2      │
-└─────────────────┘          └──────────────────┘          └─────────────────┘
+```text
+┌─────────────────┐          ┌──────────────────┐          ┌─────────────────────────┐
+│  Streamlit      │          │   Modal          │          │  Multimodal Pipeline    │
+│  Frontend       │────────▶│   Backend         │────────▶│  ┌──────────────────┐   │
+│  (Cloud/Local)  │  HTTP    │   (FastAPI)      │          │  │ Visual (BLIP-2)  │   │
+│                 │          │   • GPU Support  │          │  │ Audio (Whisper)  │   │
+│                 │          │   • Auto-scaling │          │  │ LLM Summary      │   │
+│                 │          │                  │          │  └──────────────────┘   │
+└─────────────────┘          └──────────────────┘          └─────────────────────────┘
 ```
 
 ### Frontend (`app/`)
@@ -44,12 +46,13 @@ A deep learning-based application that generates text summaries from video input
 
 - **FastAPI Server**: RESTful API for video processing
 - **Modal Deployment**: Serverless deployment with GPU support (T4/A10G)
-- **ML Pipeline**: Complete deep learning workflow for video-to-text summarization
-  - Video frame extraction (OpenCV)
-  - Feature extraction (GoogLeNet)
-  - Key frame selection (R(2+1)D video model)
-  - Caption generation (BLIP-2)
-  - Optional API summarization (OpenRouter)
+- **Multimodal ML Pipeline**: Complete workflow for video-to-text summarization
+  - **Synchronized Clip Extraction**: Time-based (frame + audio) pairs using OpenCV + FFmpeg
+  - **Visual Captioning**: BLIP-2 model for frame descriptions
+  - **Audio Transcription**: OpenAI Whisper for speech-to-text
+  - **Multimodal Fusion**: Combines visual and audio captions at each timestamp
+  - **Key Moment Selection**: Intelligent sampling of important moments
+  - **Narrative Summary**: Optional LLM-based final summarization (OpenRouter)
 
 ## 🛠️ Technology Stack
 
@@ -70,10 +73,12 @@ A deep learning-based application that generates text summaries from video input
 - ![Torchvision](https://img.shields.io/badge/-Torchvision-EE4C2C?logo=pytorch&logoColor=white) **Torchvision** - Pre-trained models (GoogLeNet, R(2+1)D)
 - ![Transformers](https://img.shields.io/badge/-Transformers-FFD700?logo=huggingface&logoColor=white) **Transformers (HuggingFace)** - BLIP-2 model
 
-### Computer Vision
+### Computer Vision & Audio
 
 - ![OpenCV](https://img.shields.io/badge/-OpenCV-5C3EE8?logo=opencv&logoColor=white) **OpenCV** - Video processing and frame extraction
 - ![Pillow](https://img.shields.io/badge/-Pillow-013243?logo=python&logoColor=white) **Pillow (PIL)** - Image processing
+- ![Whisper](https://img.shields.io/badge/-Whisper-412991?logo=openai&logoColor=white) **OpenAI Whisper** - Speech recognition and transcription
+- ![FFmpeg](https://img.shields.io/badge/-FFmpeg-007808?logo=ffmpeg&logoColor=white) **FFmpeg** - Audio extraction and processing
 
 ### Utilities
 
@@ -84,6 +89,7 @@ A deep learning-based application that generates text summaries from video input
 ## 📋 Requirements
 
 - **Python**: 3.8+
+- **FFmpeg**: Required for audio extraction (install via system package manager)
 - **GPU**: Optional but recommended for faster processing (T4 available on Modal)
 - **Memory**: Minimum 4GB RAM (8GB+ recommended for local development)
 - **Disk Space**: For video storage and model cache (~5-10GB for models)
@@ -160,7 +166,7 @@ modal deploy backend/modal_app.py
 3. **Get Your Modal URL:**
 After deployment, Modal provides a URL like:
 
-```
+```text
 https://your-username--video-summary-generator-fastapi-app.modal.run
 ```
 
@@ -238,7 +244,7 @@ curl -X POST "https://your-modal-url.modal.run/process_upload" \
 
 ## 📁 Project Structure
 
-```
+```text
 Video-Summary-Generator/
 │
 ├── app/                          # Streamlit Frontend
@@ -249,7 +255,9 @@ Video-Summary-Generator/
 │
 ├── backend/                     # FastAPI Backend
 │   ├── main.py                 # FastAPI application
-│   ├── pipeline.py             # ML pipeline implementation
+│   ├── pipeline.py             # Multimodal ML pipeline orchestration
+│   ├── video.py                # Video processing utilities (frames, features, captions)
+│   ├── audio.py                # Audio processing utilities (extraction, transcription)
 │   ├── modal_app.py            # Modal deployment configuration
 │   ├── uploads/                # Processed videos (gitignored)
 │   └── .env                    # Environment variables (gitignored)
@@ -301,8 +309,9 @@ modal secret create env \
 
 Customize in `backend/pipeline.py`:
 
-- `frame_skip`: Extract every Nth frame (default: 30)
-- `importance_threshold`: Threshold for frame selection (default: 0.5)
+- `clip_duration`: Time interval for synchronized clip extraction (default: 2.0 seconds)
+- `target_moments`: Number of key moments to select (default: 20)
+- `whisper_model`: Whisper model size - `tiny`, `base`, `small`, `medium`, `large` (default: `base`)
 
 ### Modal Configuration
 
@@ -344,13 +353,17 @@ Detailed health check.
 
 ### `POST /process_upload`
 
-Process an uploaded video and generate a summary.
+Process an uploaded video and generate a **multimodal summary**.
 
 **Request:**
 
 - Method: `POST`
 - Content-Type: `multipart/form-data`
-- Body: Video file (`.mp4`, `.mkv`, or `.mov`)
+- Body Parameters:
+  - `file`: Video file (`.mp4`, `.mkv`, or `.mov`) - **Required**
+  - `clip_duration`: Time interval for clip extraction in seconds (default: 2.0) - Optional
+  - `target_moments`: Number of key moments to select (default: 20) - Optional
+  - `whisper_model`: Whisper model size - `tiny`, `base`, `small`, `medium`, `large` (default: `base`) - Optional
 - Max file size: 500 MB
 
 **Response:**
@@ -359,7 +372,7 @@ Process an uploaded video and generate a summary.
 {
   "status": "success",
   "run_id": "uuid-here",
-  "summary": "Generated summary text...",
+  "summary": "Generated multimodal summary text...",
   "original_filename": "video.mp4",
   "file_size_bytes": 12345678
 }
@@ -371,15 +384,36 @@ Process an uploaded video and generate a summary.
 - `413`: File size exceeds limit
 - `500`: Processing error
 
-## 🧠 ML Pipeline Details
+## 🧠 Pipeline Details
 
-The pipeline consists of several stages:
+The **multimodal pipeline** processes visual and audio content together:
 
-1. **Frame Extraction**: Uses OpenCV to extract frames at configurable intervals (every 30th frame by default)
-2. **Feature Extraction**: GoogLeNet extracts 1024-dimensional feature vectors from each frame
-3. **Key Frame Selection**: R(2+1)D video model analyzes temporal clips to select ~25 most important frames
-4. **Caption Generation**: BLIP-2 (2.7B parameter model) generates detailed natural language captions for key frames
-5. **Summarization**: Optional OpenRouter API call for final summary refinement and narrative coherence
+### Pipeline Stages
+
+1. **Synchronized Clip Extraction**
+   - Extracts frames and audio segments at regular time intervals (default: 2 seconds)
+   - Ensures perfect audio-visual alignment using timestamp-based extraction
+   - Uses OpenCV for frames and FFmpeg for audio segments
+
+2. **Multimodal Caption Generation**
+   - **Visual**: BLIP-2 (2.7B parameters) generates natural language descriptions of each frame
+   - **Audio**: OpenAI Whisper transcribes speech from audio segments
+   - **Fusion**: Combines visual and audio captions at each timestamp
+
+3. **Key Moment Selection**
+   - Selects ~20 most important moments from all multimodal captions
+   - Currently uses uniform sampling (can be enhanced with diversity-based selection)
+
+4. **Narrative Summary Generation**
+   - Creates timeline of key moments with timestamps and multimodal captions
+   - Optional: LLM-based narrative summarization via OpenRouter API
+   - Fallback: Returns formatted timeline if LLM unavailable
+
+### Configurable Parameters
+
+- `clip_duration`: Time interval for clip extraction (default: 2.0 seconds)
+- `target_moments`: Number of key moments to select (default: 20)
+- `whisper_model`: Whisper model size - `tiny`, `base`, `small`, `medium`, `large` (default: `base`)
 
 ## 🧹 Cleanup
 
@@ -450,13 +484,16 @@ For issues and questions:
 
 ## 🙏 Acknowledgments
 
-- **GoogLeNet**: Pre-trained model for feature extraction
-- **R(2+1)D**: Video understanding model for temporal analysis
-- **BLIP-2**: Salesforce's advanced image captioning model
-- **Modal**: Serverless GPU infrastructure
-- **Streamlit**: Rapid web app framework
-- **OpenRouter**: API gateway for LLM summarization
+- **BLIP-2**: Salesforce's advanced multimodal image-to-text model
+- **OpenAI Whisper**: State-of-the-art speech recognition model
+- **R(2+1)D**: Video understanding model for temporal analysis (legacy feature extraction)
+- **GoogLeNet**: Pre-trained CNN for visual feature extraction (legacy)
+- **Modal**: Serverless GPU infrastructure for scalable deployment
+- **Streamlit**: Rapid web app framework for intuitive UI
+- **OpenRouter**: API gateway for LLM-based narrative summarization
+- **FFmpeg**: Multimedia framework for audio/video processing
 
 ---
 
-**Note**: This project is under active development. The pipeline may take several minutes to process videos depending on length and hardware capabilities. First request on Modal may experience cold start delays while models are loaded.
+>**Note**: This project is under active development. The **multimodal pipeline** processes both visual and audio content together, which may take several minutes depending on video length and hardware capabilities. 
+>First request on Modal may experience cold start delays while models (BLIP-2 and Whisper) are loaded.
